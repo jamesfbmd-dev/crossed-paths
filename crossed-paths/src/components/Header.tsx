@@ -10,7 +10,7 @@ export function Header({ viewMode, setViewMode }: HeaderProps) {
   return (
     <header>
       <div className="brand" onClick={() => window.location.reload()}>
-        <Globe size={24} /> GlobeTrotter
+        <Globe size={24} /> Crossed Paths
       </div>
       <div className="view-controls">
         <button className={`view-btn ${viewMode === 'list' ? 'active' : ''}`} onClick={() => setViewMode('list')}>
