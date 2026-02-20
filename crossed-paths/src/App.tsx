@@ -536,7 +536,8 @@ interface MapViewProps {
 function MapView({ people, filteredIds }: MapViewProps) {
   const mapRef = useRef<L.Map | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [expandedLocations, setExpandedLocations] = useState(new Set());
+  const [expandedLocations, setExpandedLocations] = useState(new Set<string>());
+  const [zoom, setZoom] = useState(2);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return;
@@ -544,15 +545,20 @@ function MapView({ people, filteredIds }: MapViewProps) {
     mapRef.current = L.map(containerRef.current, {
       zoomControl: false,
       attributionControl: false
-    }).setView([20, 0], 2);
+    }).setView([20, 0], zoom);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       subdomains: 'abcd',
       maxZoom: 20
     }).addTo(mapRef.current!);
 
+    mapRef.current.on('zoomend', () => {
+      setZoom(mapRef.current!.getZoom());
+    });
+
     return () => {
       if (mapRef.current) {
+        mapRef.current.off('zoomend');
         mapRef.current.remove();
         mapRef.current = null;
       }
@@ -562,9 +568,9 @@ function MapView({ people, filteredIds }: MapViewProps) {
   useEffect(() => {
     if (!mapRef.current) return;
 
-    // Clear existing markers
+    // Clear existing markers and lines
     mapRef.current!.eachLayer((layer: any) => {
-      if (layer instanceof L.Marker) {
+      if (layer instanceof L.Marker || layer instanceof L.Polyline) {
         mapRef.current!.removeLayer(layer);
       }
     });
@@ -580,45 +586,73 @@ function MapView({ people, filteredIds }: MapViewProps) {
       const location = LOCATIONS.find(l => l.id === locId);
       if (!location) return;
 
-      if (locPeople.length > 1 && !expandedLocations.has(locId)) {
+      if (locPeople.length === 1) {
+        // Single person, just show them
+        const p = locPeople[0];
         const icon = L.divIcon({
+          className: 'custom-person-icon',
+          html: `<img src="${p.avatar}" class="map-avatar" />`,
+          iconSize: [40, 40],
+          iconAnchor: [20, 20]
+        });
+        L.marker([location.lat, location.lng], { icon }).addTo(mapRef.current!)
+          .bindPopup(`<strong>${p.name}</strong><br>${p.countries.join(', ')}`);
+      } else {
+        // Multiple people - Cluster logic
+        const isExpanded = expandedLocations.has(locId);
+
+        const clusterIcon = L.divIcon({
           className: 'custom-cluster-icon',
           html: `<div class="cluster-badge">${locPeople.length}</div>`,
           iconSize: [40, 40],
           iconAnchor: [20, 20]
         });
-        const marker = L.marker([location.lat, location.lng], { icon }).addTo(mapRef.current!);
-        marker.on('click', () => {
+
+        const clusterMarker = L.marker([location.lat, location.lng], { icon: clusterIcon }).addTo(mapRef.current!);
+
+        clusterMarker.on('click', () => {
           setExpandedLocations(prev => {
             const next = new Set(prev);
-            next.add(locId);
+            if (next.has(locId)) next.delete(locId);
+            else next.add(locId);
             return next;
           });
         });
-      } else {
-        locPeople.forEach((p, index) => {
-          let lat = location.lat;
-          let lng = location.lng;
 
-          if (locPeople.length > 1) {
-            const angle = (index / locPeople.length) * 2 * Math.PI;
-            const radius = 2 / Math.pow(2, mapRef.current!.getZoom());
-            lat += Math.cos(angle) * radius;
-            lng += Math.sin(angle) * radius;
-          }
+        if (isExpanded) {
+          locPeople.forEach((p, index) => {
+            // Calculate position around the cluster badge using pixel offsets for a perfect circle
+            const angle = -Math.PI / 2 + (index / locPeople.length) * 2 * Math.PI;
+            const pixelRadius = 80; // pixels
 
-          const icon = L.divIcon({
-            className: 'custom-person-icon',
-            html: `<img src="${p.avatar}" class="map-avatar" />`,
-            iconSize: [40, 40],
-            iconAnchor: [20, 20]
+            const centerPoint = mapRef.current!.project([location.lat, location.lng], zoom);
+            const targetPoint = L.point(
+              centerPoint.x + Math.cos(angle) * pixelRadius,
+              centerPoint.y + Math.sin(angle) * pixelRadius
+            );
+            const targetLatLng = mapRef.current!.unproject(targetPoint, zoom);
+
+            // Draw connecting line
+            L.polyline([[location.lat, location.lng], targetLatLng], {
+              color: '#818cf8', // slightly lighter indigo
+              weight: 3,
+              opacity: 0.8,
+              dashArray: '4, 4'
+            }).addTo(mapRef.current!);
+
+            const icon = L.divIcon({
+              className: 'custom-person-icon',
+              html: `<img src="${p.avatar}" class="map-avatar" />`,
+              iconSize: [40, 40],
+              iconAnchor: [20, 20]
+            });
+            L.marker(targetLatLng, { icon }).addTo(mapRef.current!)
+              .bindPopup(`<strong>${p.name}</strong><br>${p.countries.join(', ')}`);
           });
-          L.marker([lat, lng], { icon }).addTo(mapRef.current!)
-            .bindPopup(`<strong>${p.name}</strong><br>${p.countries.join(', ')}`);
-        });
+        }
       }
     });
-  }, [people, filteredIds, expandedLocations]);
+  }, [people, filteredIds, expandedLocations, zoom]);
 
   return (
     <div className="map-view-wrapper">
