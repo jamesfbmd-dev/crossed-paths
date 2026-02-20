@@ -1,18 +1,20 @@
 import { useState } from 'react';
 import { X, Check } from 'lucide-react';
 import type { Person, ModalMode } from '../types';
+import { LOCATIONS } from '../data/locations';
+import { MultiSelect } from './MultiSelect';
 
 interface PersonModalProps {
   mode: ModalMode;
   onClose: () => void;
-  onSubmit: (data: any) => void;
+  onSubmit: (data: Person) => void;
   existingPeople: Person[];
   initialData: Person | null;
 }
 
 export function PersonModal({ mode, onClose, onSubmit, existingPeople, initialData }: PersonModalProps) {
   const [name, setName] = useState(initialData?.name || '');
-  const [countries, setCountries] = useState(initialData?.countries.join(', ') || '');
+  const [locationIds, setLocationIds] = useState<string[]>(initialData?.locationIds || []);
   const [conns, setConns] = useState<string[]>(initialData?.connections || []);
 
   const toggleConnection = (id: string) => {
@@ -33,7 +35,7 @@ export function PersonModal({ mode, onClose, onSubmit, existingPeople, initialDa
             id: initialData?.id || Date.now().toString(),
             name,
             avatar: initialData?.avatar || `https://i.pravatar.cc/150?u=${name}`,
-            countries: countries.split(',').map(s => s.trim()).filter(Boolean),
+            locationIds,
             connections: conns
           });
         }}>
@@ -41,7 +43,14 @@ export function PersonModal({ mode, onClose, onSubmit, existingPeople, initialDa
           <input className="modal-input" value={name} onChange={e => setName(e.target.value)} required placeholder="e.g. John Doe" />
 
           <label style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block', marginBottom: '0.4rem' }}>Countries visited</label>
-          <input className="modal-input" value={countries} onChange={e => setCountries(e.target.value)} placeholder="e.g. Italy, USA, Japan" />
+          <div style={{ marginBottom: '1.25rem' }}>
+            <MultiSelect
+              label="Countries"
+              options={LOCATIONS.map(l => ({ label: l.name, value: l.id }))}
+              selected={locationIds}
+              setSelected={setLocationIds}
+            />
+          </div>
 
           <label style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block', marginBottom: '0.4rem' }}>Connect with your network</label>
           <div className="connection-select-list">
