@@ -2,38 +2,35 @@ import { useState, useMemo } from 'react';
 import { Plus } from 'lucide-react';
 import './styles/App.css';
 import { INITIAL_PEOPLE } from './data/people';
+import { LOCATIONS } from './data/locations';
 import type { Person, ViewMode, ModalMode } from './types';
 import { Header } from './components/Header';
 import { Toolbar } from './components/Toolbar';
 import { PersonCard } from './components/PersonCard';
 import { PersonModal } from './components/PersonModal';
 import { NetworkView } from './components/NetworkView';
+import { MapView } from './components/MapView';
 
 export default function App() {
   const [people, setPeople] = useState<Person[]>(INITIAL_PEOPLE);
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [search, setSearch] = useState('');
-  const [selectedCountries, setSelectedCountries] = useState<string[]>([]);
+  const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([]);
   const [selectedConnections, setSelectedConnections] = useState<string[]>([]);
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [editingPerson, setEditingPerson] = useState<Person | null>(null);
 
-  const allCountries = useMemo(() => {
-    const set = new Set<string>();
-    people.forEach(p => p.countries.forEach(c => set.add(c)));
-    return Array.from(set).sort();
-  }, [people]);
 
   const filteredPeople = useMemo(() => {
     return people.filter(p => {
       const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase());
-      const matchesCountries = selectedCountries.length === 0 || 
-        selectedCountries.some(c => p.countries.includes(c));
+      const matchesLocations = selectedLocationIds.length === 0 ||
+        selectedLocationIds.some(id => p.locationIds.includes(id));
       const matchesConnections = selectedConnections.length === 0 || 
         selectedConnections.some(id => p.connections.includes(id));
-      return matchesSearch && matchesCountries && matchesConnections;
+      return matchesSearch && matchesLocations && matchesConnections;
     });
-  }, [people, search, selectedCountries, selectedConnections]);
+  }, [people, search, selectedLocationIds, selectedConnections]);
 
   const handleSave = (data: Person) => {
     if (modalMode === 'add') {
@@ -73,16 +70,16 @@ export default function App() {
         <Toolbar
           search={search}
           setSearch={setSearch}
-          allCountries={allCountries}
-          selectedCountries={selectedCountries}
-          setSelectedCountries={setSelectedCountries}
+          allLocationOptions={LOCATIONS.map(l => ({ label: l.name, value: l.id }))}
+          selectedLocationIds={selectedLocationIds}
+          setSelectedLocationIds={setSelectedLocationIds}
           people={people}
           selectedConnections={selectedConnections}
           setSelectedConnections={setSelectedConnections}
         />
 
         <main style={{flex: 1, position: 'relative', overflow: 'hidden'}}>
-          {viewMode === 'list' ? (
+          {viewMode === 'list' && (
             <div className="list-view">
               {filteredPeople.map(p => (
                 <PersonCard
@@ -94,7 +91,10 @@ export default function App() {
                 />
               ))}
             </div>
-          ) : <NetworkView people={people} filteredIds={filteredPeople.map(p => p.id)} />}
+          )}
+          {viewMode === 'network' && <NetworkView people={people} filteredIds={filteredPeople.map(p => p.id)} />}
+          {viewMode === 'map' && <MapView people={filteredPeople} />}
+
           <button className="fab" onClick={() => { setEditingPerson(null); setModalMode('add'); }}><Plus size={32} /></button>
         </main>
 

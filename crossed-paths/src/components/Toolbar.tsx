@@ -5,20 +5,20 @@ import type { Person } from '../types';
 interface ToolbarProps {
   search: string;
   setSearch: (val: string) => void;
-  allCountries: string[];
-  selectedCountries: string[];
-  setSelectedCountries: (val: any) => void;
+  allLocationOptions: { label: string; value: string }[];
+  selectedLocationIds: string[];
+  setSelectedLocationIds: (val: string[]) => void;
   people: Person[];
   selectedConnections: string[];
-  setSelectedConnections: (val: any) => void;
+  setSelectedConnections: (val: string[]) => void;
 }
 
 export function Toolbar({
   search,
   setSearch,
-  allCountries,
-  selectedCountries,
-  setSelectedCountries,
+  allLocationOptions,
+  selectedLocationIds,
+  setSelectedLocationIds,
   people,
   selectedConnections,
   setSelectedConnections
@@ -29,13 +29,23 @@ export function Toolbar({
         <Search size={18} />
         <input className="search-input" placeholder="Search by name..." value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
-      <MultiSelect label="Countries" options={allCountries} selected={selectedCountries} setSelected={setSelectedCountries} />
-      <MultiSelect label="Connections" options={people.map(p => ({ label: p.name, value: p.id }))} selected={selectedConnections} setSelected={setSelectedConnections} />
+      <MultiSelect
+        label="Countries"
+        options={allLocationOptions}
+        selected={selectedLocationIds}
+        setSelected={setSelectedLocationIds}
+      />
+      <MultiSelect
+        label="Connections"
+        options={people.map(p => ({ label: p.name, value: p.id }))}
+        selected={selectedConnections}
+        setSelected={setSelectedConnections}
+      />
       <button
         className="toolbar-reset"
         onClick={() => {
           setSelectedConnections([]);
-          setSelectedCountries([]);
+          setSelectedLocationIds([]);
           setSearch('');
         }}
       >

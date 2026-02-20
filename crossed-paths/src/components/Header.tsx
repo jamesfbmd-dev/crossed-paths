@@ -1,4 +1,4 @@
-import { Globe, Users, Share2 } from 'lucide-react';
+import { Globe, Users, Share2, Map as MapIcon } from 'lucide-react';
 import type { ViewMode } from '../types';
 
 interface HeaderProps {
@@ -18,6 +18,9 @@ export function Header({ viewMode, setViewMode }: HeaderProps) {
         </button>
         <button className={`view-btn ${viewMode === 'network' ? 'active' : ''}`} onClick={() => setViewMode('network')}>
           <Share2 size={18} /> Network
+        </button>
+        <button className={`view-btn ${viewMode === 'map' ? 'active' : ''}`} onClick={() => setViewMode('map')}>
+          <MapIcon size={18} /> Map
         </button>
       </div>
     </header>
