@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Users, Share2, Plus, X, MapPin, Edit2, Trash2, Search, Filter, Globe, ChevronDown, Check, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import type { Person } from './types';
+import { Users, Share2, Plus, X, MapPin, Edit2, Trash2, Search, Globe, ChevronDown, Check, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
 import './styles/App.css';
 import { INITIAL_PEOPLE } from './data/people';
+import { LOCATIONS } from './data/locations';
 
 export default function App() {
   const [people, setPeople] = useState(INITIAL_PEOPLE);
@@ -9,8 +13,8 @@ export default function App() {
   const [search, setSearch] = useState('');
   const [selectedCountries, setSelectedCountries] = useState([]);
   const [selectedConnections, setSelectedConnections] = useState([]);
-  const [modalMode, setModalMode] = useState(null); 
-  const [editingPerson, setEditingPerson] = useState(null);
+  const [modalMode, setModalMode] = useState<'add' | 'edit' | null>(null);
+  const [editingPerson, setEditingPerson] = useState<Person | null>(null);
 
   const allCountries = useMemo(() => {
     const set = new Set();
@@ -29,7 +33,7 @@ export default function App() {
     });
   }, [people, search, selectedCountries, selectedConnections]);
 
-  const handleSave = (data) => {
+  const handleSave = (data: Person) => {
     if (modalMode === 'add') {
       setPeople(prev => {
         const updated = [...prev, data];
@@ -53,7 +57,7 @@ export default function App() {
     setModalMode(null);
   };
 
-  const deletePerson = (id) => {
+  const deletePerson = (id: string) => {
     setPeople(prev => prev.filter(p => p.id !== id).map(p => ({
       ...p, connections: p.connections.filter(c => c !== id)
     })));
@@ -73,13 +77,16 @@ export default function App() {
             <button className={`view-btn ${viewMode === 'network' ? 'active' : ''}`} onClick={() => setViewMode('network')}>
               <Share2 size={18} /> Network
             </button>
+            <button className={`view-btn ${viewMode === 'map' ? 'active' : ''}`} onClick={() => setViewMode('map')}>
+              <MapPin size={18} /> Map
+            </button>
           </div>
         </header>
 
         <div className="toolbar">
           <div className="search-wrapper">
             <Search size={18} />
-            <input className="search-input" placeholder="Search by name..." value={search} onChange={(e) => setSearch(e.target.value)} />
+            <input className="search-input" placeholder="Search by name..." value={search} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)} />
           </div>
           <MultiSelect label="Countries" options={allCountries} selected={selectedCountries} setSelected={setSelectedCountries} />
           <MultiSelect label="Connections" options={people.map(p => ({ label: p.name, value: p.id }))} selected={selectedConnections} setSelected={setSelectedConnections} />
@@ -101,6 +108,9 @@ export default function App() {
                     <h3 style={{fontSize: '1rem', color: 'white', marginBottom: '0.2rem'}}>{p.name}</h3>
                     <div style={{display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.5rem'}}>
                       {p.countries.map(c => <span key={c} className="tag">{c}</span>)}
+                      <span className="tag" style={{background: 'rgba(239, 68, 68, 0.1)', color: '#fca5a5', borderColor: 'rgba(239, 68, 68, 0.2)'}}>
+                        <MapPin size={10} style={{marginRight: '2px'}} /> {LOCATIONS.find(l => l.id === p.locationId)?.name}
+                      </span>
                     </div>
                   </div>
                   <div style={{marginTop: 'auto', borderTop: '1px solid var(--border-color)', paddingTop: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
@@ -116,7 +126,11 @@ export default function App() {
                 </div>
               ))}
             </div>
-          ) : <NetworkView people={people} filteredIds={filteredPeople.map(p => p.id)} />}
+          ) : viewMode === 'network' ? (
+            <NetworkView people={people} filteredIds={filteredPeople.map(p => p.id)} />
+          ) : (
+            <MapView people={people} filteredIds={filteredPeople.map(p => p.id)} />
+          )}
           <button className="fab" onClick={() => setModalMode('add')}><Plus size={32} /></button>
         </main>
 
@@ -128,12 +142,18 @@ export default function App() {
   );
 }
 
-function MultiSelect({ label, options, selected, setSelected }) {
+interface MultiSelectProps {
+  label: string;
+  options: any[];
+  selected: any[];
+  setSelected: (val: any) => void;
+}
+function MultiSelect({ label, options, selected, setSelected }: MultiSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const ref = useRef(null);
+  const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const click = (e) => ref.current && !ref.current.contains(e.target) && setIsOpen(false);
+    const click = (e: MouseEvent) => ref.current && !ref.current.contains(e.target as Node) && setIsOpen(false);
     document.addEventListener('mousedown', click);
     return () => document.removeEventListener('mousedown', click);
   }, []);
@@ -151,7 +171,7 @@ function MultiSelect({ label, options, selected, setSelected }) {
           const isSelected = selected.includes(val);
           return (
             <div key={val} className={`multi-option ${isSelected ? 'selected' : ''}`}
-                 onClick={() => setSelected(prev => prev.includes(val) ? prev.filter(v => v !== val) : [...prev, val])}>
+                 onClick={() => setSelected((prev: any[]) => prev.includes(val) ? prev.filter((v: any) => v !== val) : [...prev, val])}>
               <div className="checkbox-visual">{isSelected && <Check size={12} strokeWidth={3} />}</div>
               {name}
             </div>
@@ -162,12 +182,20 @@ function MultiSelect({ label, options, selected, setSelected }) {
   );
 }
 
-function PersonModal({ mode, onClose, onSubmit, existingPeople, initialData }) {
+interface PersonModalProps {
+  mode: 'add' | 'edit';
+  onClose: () => void;
+  onSubmit: (data: Person) => void;
+  existingPeople: Person[];
+  initialData: Person | null;
+}
+function PersonModal({ mode, onClose, onSubmit, existingPeople, initialData }: PersonModalProps) {
   const [name, setName] = useState(initialData?.name || '');
   const [countries, setCountries] = useState(initialData?.countries.join(', ') || '');
+  const [locationId, setLocationId] = useState(initialData?.locationId || LOCATIONS[0].id);
   const [conns, setConns] = useState(initialData?.connections || []);
 
-  const toggleConnection = (id) => {
+  const toggleConnection = (id: string) => {
     setConns(prev => prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]);
   };
 
@@ -186,12 +214,20 @@ function PersonModal({ mode, onClose, onSubmit, existingPeople, initialData }) {
             name,
             avatar: initialData?.avatar || `https://i.pravatar.cc/150?u=${name}`,
             countries: countries.split(',').map(s => s.trim()).filter(Boolean),
+            locationId,
             connections: conns
           });
         }}>
           <label style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block', marginBottom: '0.4rem' }}>Name</label>
           <input className="modal-input" value={name} onChange={e => setName(e.target.value)} required placeholder="e.g. John Doe" />
           
+          <label htmlFor="primary-location" style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block', marginBottom: '0.4rem' }}>Primary Location</label>
+          <select id="primary-location" className="modal-input" value={locationId} onChange={e => setLocationId(e.target.value)}>
+            {LOCATIONS.map(loc => (
+              <option key={loc.id} value={loc.id}>{loc.name}</option>
+            ))}
+          </select>
+
           <label style={{ color: 'var(--text-muted)', fontSize: '0.8rem', display: 'block', marginBottom: '0.4rem' }}>Countries visited</label>
           <input className="modal-input" value={countries} onChange={e => setCountries(e.target.value)} placeholder="e.g. Italy, USA, Japan" />
 
@@ -237,19 +273,23 @@ function PersonModal({ mode, onClose, onSubmit, existingPeople, initialData }) {
   );
 }
 
-function NetworkView({ people, filteredIds }) {
-  const containerRef = useRef(null);
-  const [positions, setPositions] = useState({});
-  const [hoveredNode, setHoveredNode] = useState(null);
-  const [draggingNode, setDraggingNode] = useState(null);
+interface NetworkViewProps {
+  people: Person[];
+  filteredIds: string[];
+}
+function NetworkView({ people, filteredIds }: NetworkViewProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [positions, setPositions] = useState<Record<string, {x: number, y: number}>>({});
+  const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [draggingNode, setDraggingNode] = useState<any | null>(null);
   
   const [transform, setTransform] = useState({ x: 0, y: 0, k: 1 });
   const [isPanning, setIsPanning] = useState(false);
-  const panStartRef = useRef({ x: 0, y: 0 });
+  const panStartRef = useRef<{ x: number, y: number }>({ x: 0, y: 0 });
 
-  const nodesRef = useRef([]);
-  const edgesRef = useRef([]);
-  const requestRef = useRef();
+  const nodesRef = useRef<any[]>([]);
+  const edgesRef = useRef<any[]>([]);
+  const requestRef = useRef<number>(undefined);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -268,7 +308,7 @@ function NetworkView({ people, filteredIds }) {
     });
 
     const edgeSet = new Set();
-    const newEdges = [];
+    const newEdges: any[] = [];
     people.forEach(p => p.connections.forEach(tId => {
       const id = [p.id, tId].sort().join('-');
       if (!edgeSet.has(id)) {
@@ -323,7 +363,7 @@ function NetworkView({ people, filteredIds }) {
         t.vx -= fx; t.vy -= fy;
       });
 
-      const updatedPositions = {};
+      const updatedPositions: Record<string, {x: number, y: number}> = {};
       nodes.forEach(n => {
         n.vx += (w / 2 - n.x) * centerForce;
         n.vy += (h / 2 - n.y) * centerForce;
@@ -347,17 +387,17 @@ function NetworkView({ people, filteredIds }) {
     };
 
     requestRef.current = requestAnimationFrame(frame);
-    return () => cancelAnimationFrame(requestRef.current);
+    return () => { if (requestRef.current) cancelAnimationFrame(requestRef.current); };
   }, [draggingNode]);
 
-  const toSimCoords = (clientX, clientY) => {
-    const rect = containerRef.current.getBoundingClientRect();
+  const toSimCoords = (clientX: number, clientY: number) => {
+    const rect = containerRef.current!.getBoundingClientRect();
     const x = (clientX - rect.left - transform.x) / transform.k;
     const y = (clientY - rect.top - transform.y) / transform.k;
     return { x, y };
   };
 
-  const handlePointerDown = (e, node) => {
+  const handlePointerDown = (e: React.PointerEvent, node: any | null) => {
     e.stopPropagation();
     if (node) {
       const coords = toSimCoords(e.clientX, e.clientY);
@@ -368,7 +408,7 @@ function NetworkView({ people, filteredIds }) {
     }
   };
 
-  const handlePointerMove = (e) => {
+  const handlePointerMove = (e: React.PointerEvent) => {
     if (draggingNode) {
       const coords = toSimCoords(e.clientX, e.clientY);
       setDraggingNode({ ...draggingNode, simX: coords.x, simY: coords.y });
@@ -386,11 +426,11 @@ function NetworkView({ people, filteredIds }) {
     setIsPanning(false);
   };
 
-  const handleWheel = (e) => {
+  const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
     const delta = -e.deltaY;
     const factor = Math.pow(1.1, delta / 100);
-    const rect = containerRef.current.getBoundingClientRect();
+    const rect = containerRef.current!.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
 
@@ -405,7 +445,7 @@ function NetworkView({ people, filteredIds }) {
     });
   };
 
-  const adjustZoom = (delta) => {
+  const adjustZoom = (delta: number) => {
     if (!containerRef.current) return;
     const w = containerRef.current.clientWidth;
     const h = containerRef.current.clientHeight;
@@ -486,6 +526,108 @@ function NetworkView({ people, filteredIds }) {
           })}
         </g>
       </svg>
+    </div>
+  );
+}
+interface MapViewProps {
+  people: Person[];
+  filteredIds: string[];
+}
+function MapView({ people, filteredIds }: MapViewProps) {
+  const mapRef = useRef<L.Map | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [expandedLocations, setExpandedLocations] = useState(new Set());
+
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
+
+    mapRef.current = L.map(containerRef.current, {
+      zoomControl: false,
+      attributionControl: false
+    }).setView([20, 0], 2);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      subdomains: 'abcd',
+      maxZoom: 20
+    }).addTo(mapRef.current!);
+
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    // Clear existing markers
+    mapRef.current!.eachLayer((layer: any) => {
+      if (layer instanceof L.Marker) {
+        mapRef.current!.removeLayer(layer);
+      }
+    });
+
+    const visiblePeople = people.filter(p => filteredIds.includes(p.id));
+    const peopleByLocation: Record<string, Person[]> = {};
+    visiblePeople.forEach(p => {
+      if (!peopleByLocation[p.locationId]) peopleByLocation[p.locationId] = [];
+      peopleByLocation[p.locationId].push(p);
+    });
+
+    Object.entries(peopleByLocation).forEach(([locId, locPeople]) => {
+      const location = LOCATIONS.find(l => l.id === locId);
+      if (!location) return;
+
+      if (locPeople.length > 1 && !expandedLocations.has(locId)) {
+        const icon = L.divIcon({
+          className: 'custom-cluster-icon',
+          html: `<div class="cluster-badge">${locPeople.length}</div>`,
+          iconSize: [40, 40],
+          iconAnchor: [20, 20]
+        });
+        const marker = L.marker([location.lat, location.lng], { icon }).addTo(mapRef.current!);
+        marker.on('click', () => {
+          setExpandedLocations(prev => {
+            const next = new Set(prev);
+            next.add(locId);
+            return next;
+          });
+        });
+      } else {
+        locPeople.forEach((p, index) => {
+          let lat = location.lat;
+          let lng = location.lng;
+
+          if (locPeople.length > 1) {
+            const angle = (index / locPeople.length) * 2 * Math.PI;
+            const radius = 2 / Math.pow(2, mapRef.current!.getZoom());
+            lat += Math.cos(angle) * radius;
+            lng += Math.sin(angle) * radius;
+          }
+
+          const icon = L.divIcon({
+            className: 'custom-person-icon',
+            html: `<img src="${p.avatar}" class="map-avatar" />`,
+            iconSize: [40, 40],
+            iconAnchor: [20, 20]
+          });
+          L.marker([lat, lng], { icon }).addTo(mapRef.current!)
+            .bindPopup(`<strong>${p.name}</strong><br>${p.countries.join(', ')}`);
+        });
+      }
+    });
+  }, [people, filteredIds, expandedLocations]);
+
+  return (
+    <div className="map-view-wrapper">
+      <div ref={containerRef} className="map-view-container" />
+      <div className="map-controls">
+        <button className="zoom-btn" onClick={() => mapRef.current?.zoomIn()}><ZoomIn size={18} /></button>
+        <button className="zoom-btn" onClick={() => mapRef.current?.zoomOut()}><ZoomOut size={18} /></button>
+        <button className="zoom-btn" onClick={() => mapRef.current?.setView([20, 0], 2)}><Maximize size={18} /></button>
+      </div>
     </div>
   );
 }
