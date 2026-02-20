@@ -1,4 +1,4 @@
-import { Search } from 'lucide-react';
+import { Search, Undo2 } from 'lucide-react';
 import { MultiSelect } from './MultiSelect';
 import type { Person } from '../types';
 
@@ -31,6 +31,16 @@ export function Toolbar({
       </div>
       <MultiSelect label="Countries" options={allCountries} selected={selectedCountries} setSelected={setSelectedCountries} />
       <MultiSelect label="Connections" options={people.map(p => ({ label: p.name, value: p.id }))} selected={selectedConnections} setSelected={setSelectedConnections} />
+      <button
+        className="toolbar-reset"
+        onClick={() => {
+          setSelectedConnections([]);
+          setSelectedCountries([]);
+          setSearch('');
+        }}
+      >
+        <Undo2 size={18} /> Reset Filters
+      </button>
     </div>
   );
 }

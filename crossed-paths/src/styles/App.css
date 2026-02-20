@@ -64,6 +64,21 @@ header {
   backdrop-filter: blur(10px);
   position: relative;
   z-index: 500; /* Lower than header but higher than cards */
+
+  & .toolbar-reset {
+    background: var(--primary);
+    border: none;
+    color: var(--text-main);
+    padding: 0.7rem 1rem;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    transition: var(--transition);
+  }
 }
 
 .search-wrapper {
