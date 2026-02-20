@@ -46,10 +46,23 @@ export function LocationMarker({ location, people, isExpanded, onToggle }: Locat
       `;
     }).join('') : '';
 
+    const linesHtml = isExpanded ? people.map((_, index) => {
+      const angle = (index / people.length) * 2 * Math.PI;
+      const radius = 60;
+      const x = Math.cos(angle) * radius;
+      const y = Math.sin(angle) * radius;
+      return `<line x1="100" y1="100" x2="${100 + x}" y2="${100 + y}" class="cluster-connection-line" />`;
+    }).join('') : '';
+
     const iconHtml = `
       <div class="cluster-marker-container">
         <div class="cluster-marker">${people.length}</div>
-        ${isExpanded ? `<div class="expanded-people-wrapper">${peopleHtml}</div>` : ''}
+        ${isExpanded ? `
+          <svg class="cluster-lines-svg" width="200" height="200" viewBox="0 0 200 200">
+            ${linesHtml}
+          </svg>
+          <div class="expanded-people-wrapper">${peopleHtml}</div>
+        ` : ''}
       </div>
     `;
 
@@ -66,6 +79,7 @@ export function LocationMarker({ location, people, isExpanded, onToggle }: Locat
       position={location.coordinates}
       icon={icon}
       eventHandlers={{ click: onToggle }}
+      zIndexOffset={isExpanded ? 1000 : 0}
     />
   );
 }
